@@ -1,0 +1,110 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2024-03-15T08:30:00Z",
+    "tools": [{"name": "sbom-demo-generator", "version": "1.0"}],
+    "component": {
+      "type": "application",
+      "name": "demo-webapp",
+      "version": "2.4.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/lodash@4.17.15",
+      "name": "lodash",
+      "version": "4.17.15",
+      "purl": "pkg:npm/lodash@4.17.15"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/minimist@1.2.0",
+      "name": "minimist",
+      "version": "1.2.0",
+      "purl": "pkg:npm/minimist@1.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/axios@0.21.0",
+      "name": "axios",
+      "version": "0.21.0",
+      "purl": "pkg:npm/axios@0.21.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/express@4.16.0",
+      "name": "express",
+      "version": "4.16.0",
+      "purl": "pkg:npm/express@4.16.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/django@2.2.0",
+      "name": "django",
+      "version": "2.2.0",
+      "purl": "pkg:pypi/django@2.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/requests@2.19.0",
+      "name": "requests",
+      "version": "2.19.0",
+      "purl": "pkg:pypi/requests@2.19.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pillow@8.1.0",
+      "name": "pillow",
+      "version": "8.1.0",
+      "purl": "pkg:pypi/pillow@8.1.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "name": "log4j-core",
+      "version": "2.14.1",
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/react@18.2.0",
+      "name": "react",
+      "version": "18.2.0",
+      "purl": "pkg:npm/react@18.2.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/chalk@4.1.2",
+      "name": "chalk",
+      "version": "4.1.2",
+      "purl": "pkg:npm/chalk@4.1.2"
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "id": "CVE-2021-44228",
+      "analysis": {
+        "state": "not_affected",
+        "justification": "code_not_reachable",
+        "detail": "La aplicación no usa el módulo JNDI Lookup; está deshabilitado vía configuración -Dlog4j2.formatMsgNoLookups=true en producción."
+      },
+      "affects": [
+        { "ref": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1" }
+      ]
+    },
+    {
+      "id": "CVE-2020-28168",
+      "analysis": {
+        "state": "exploitable",
+        "detail": "Componente expuesto: el servicio backend hace requests con la URL recibida del usuario. Pendiente actualizar a axios 0.21.1."
+      },
+      "affects": [
+        { "ref": "pkg:npm/axios@0.21.0" }
+      ]
+    }
+  ]
+}

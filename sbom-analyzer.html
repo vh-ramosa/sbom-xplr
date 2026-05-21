@@ -1,0 +1,2418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SBOM Analyzer / Vulnerability Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d0e;
+    --bg-elev: #111416;
+    --bg-elev-2: #181c1f;
+    --border: #2a2f33;
+    --border-soft: #1e2225;
+    --text: #e8e6e1;
+    --text-dim: #9aa0a4;
+    --text-faint: #5d6166;
+    --accent: #ffb340;        /* amber */
+    --accent-2: #4cd4d4;       /* cyan */
+    --crit: #ff4d5e;
+    --high: #ff8a3d;
+    --med:  #ffd23f;
+    --low:  #6ad58b;
+    --none: #5d6166;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+    --serif: "Fraunces", Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.55;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 15% 8%, rgba(255,179,64,0.05), transparent 35%),
+      radial-gradient(circle at 90% 90%, rgba(76,212,212,0.04), transparent 40%),
+      linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+    background-size: auto, auto, 32px 32px, 32px 32px;
+  }
+
+  /* ---------- HEADER ---------- */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: rgba(11,13,14,0.85);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .brand {
+    display: flex; align-items: baseline; gap: 14px;
+  }
+  .brand .mark {
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .brand .mark em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 400;
+  }
+  .brand .tag {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--text-faint);
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .status-pill {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--low);
+    box-shadow: 0 0 8px var(--low);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  /* ---------- MAIN ---------- */
+  main { padding: 40px 32px 80px; max-width: 1500px; margin: 0 auto; }
+
+  /* ---------- HERO / DROPZONE ---------- */
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 40px;
+  }
+  @media (max-width: 980px) { .hero { grid-template-columns: 1fr; } }
+
+  .intro h1 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(38px, 5vw, 62px);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    margin: 0 0 18px;
+    color: var(--text);
+  }
+  .intro h1 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--accent);
+  }
+  .intro p {
+    color: var(--text-dim);
+    max-width: 50ch;
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+  .intro .meta {
+    margin-top: 22px;
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .intro .meta span::before {
+    content: "▸ ";
+    color: var(--accent-2);
+  }
+
+  .dropzone {
+    border: 1px dashed var(--border);
+    background: var(--bg-elev);
+    padding: 32px;
+    position: relative;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 260px;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: var(--bg-elev-2);
+  }
+  .dropzone.dragover {
+    box-shadow: inset 0 0 0 1px var(--accent), 0 0 32px rgba(255,179,64,0.15);
+  }
+  .dropzone .corner {
+    position: absolute;
+    width: 14px; height: 14px;
+    border: 1px solid var(--accent);
+  }
+  .dropzone .corner.tl { top: -1px; left: -1px; border-right:none; border-bottom:none; }
+  .dropzone .corner.tr { top: -1px; right: -1px; border-left:none; border-bottom:none; }
+  .dropzone .corner.bl { bottom: -1px; left: -1px; border-right:none; border-top:none; }
+  .dropzone .corner.br { bottom: -1px; right: -1px; border-left:none; border-top:none; }
+
+  .dropzone-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--text-faint);
+    margin-bottom: 14px;
+  }
+  .dropzone-main {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--text);
+    font-weight: 400;
+    margin-bottom: 12px;
+  }
+  .dropzone-sub {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-bottom: 22px;
+  }
+  .dropzone-formats {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .format-chip {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 5px 10px;
+    background: rgba(76,212,212,0.08);
+    border: 1px solid rgba(76,212,212,0.25);
+    color: var(--accent-2);
+  }
+  #fileInput { display: none; }
+
+  /* ---------- CONTROLS ---------- */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 28px 0 24px;
+    flex-wrap: wrap;
+  }
+  button.primary, button.ghost {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    padding: 11px 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  button.primary {
+    background: var(--accent);
+    color: #1a1305;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  button.primary:hover:not(:disabled) { background: #ffc15a; }
+  button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost:hover { border-color: var(--accent-2); color: var(--accent-2); }
+
+  /* ---------- PROGRESS ---------- */
+  .progress {
+    display: none;
+    align-items: center; gap: 14px;
+    color: var(--text-dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+  }
+  .progress.active { display: flex; }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 1.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- SUMMARY CARDS ---------- */
+  .summary {
+    display: none;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    margin-bottom: 32px;
+    border: 1px solid var(--border);
+  }
+  .summary.shown { display: grid; }
+  .stat {
+    background: var(--bg-elev);
+    padding: 22px 24px;
+  }
+  .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--text-faint);
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-family: var(--serif);
+    font-size: 36px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--text);
+  }
+  .stat-value.crit { color: var(--crit); }
+  .stat-value.high { color: var(--high); }
+  .stat-value.med  { color: var(--med); }
+  .stat-value.low  { color: var(--low); }
+  .stat-sub {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* ---------- FILTERS ---------- */
+  .filters {
+    display: none;
+    gap: 8px; align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .filters.shown { display: flex; }
+  .filter-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text-faint);
+    margin-right: 4px;
+  }
+  .filter-btn {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { color: var(--text); }
+  .filter-btn.active {
+    color: var(--bg);
+    background: var(--text);
+    border-color: var(--text);
+  }
+  .search-input {
+    margin-left: auto;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    min-width: 220px;
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--accent); }
+
+  /* ---------- TABLE ---------- */
+  .results { display: none; }
+  .results.shown { display: block; }
+  .table-wrap {
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elev-2);
+    position: sticky; top: 0;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: var(--bg-elev-2); }
+  tbody tr.expanded { background: var(--bg-elev-2); }
+  tbody td {
+    padding: 13px 16px;
+    vertical-align: top;
+    font-size: 12.5px;
+  }
+  td.name {
+    color: var(--text);
+    font-weight: 500;
+  }
+  td.version { color: var(--accent-2); }
+  td.purl {
+    color: var(--text-faint);
+    font-size: 11px;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sev-badge {
+    display: inline-block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    padding: 3px 8px;
+    border: 1px solid;
+    font-weight: 500;
+  }
+  .sev-badge.crit { color: var(--crit); border-color: var(--crit); background: rgba(255,77,94,0.08); }
+  .sev-badge.high { color: var(--high); border-color: var(--high); background: rgba(255,138,61,0.08); }
+  .sev-badge.med  { color: var(--med);  border-color: var(--med);  background: rgba(255,210,63,0.08); }
+  .sev-badge.low  { color: var(--low);  border-color: var(--low);  background: rgba(106,213,139,0.08); }
+  .sev-badge.none { color: var(--text-faint); border-color: var(--border); }
+  .sev-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sev-count {
+    font-family: var(--mono);
+    font-weight: 500;
+  }
+  .expand-row td {
+    background: #0d1012;
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .expand-inner {
+    padding: 24px 32px 28px;
+    animation: slideDown 0.25s ease-out;
+  }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .vuln-list { display: flex; flex-direction: column; gap: 16px; }
+  .vuln-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-soft);
+    border-left: 2px solid var(--text-faint);
+    padding: 16px 20px;
+  }
+  .vuln-card.crit { border-left-color: var(--crit); }
+  .vuln-card.high { border-left-color: var(--high); }
+  .vuln-card.med  { border-left-color: var(--med); }
+  .vuln-card.low  { border-left-color: var(--low); }
+  .vuln-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .vuln-id {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--accent);
+    font-size: 13px;
+    text-decoration: none;
+  }
+  .vuln-id:hover { text-decoration: underline; }
+  .vuln-aliases {
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+  .vuln-summary {
+    font-family: var(--serif);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text);
+    margin-bottom: 14px;
+    font-weight: 400;
+  }
+  .vuln-meta {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1px;
+    background: var(--border-soft);
+    border: 1px solid var(--border-soft);
+    margin-bottom: 14px;
+  }
+  .meta-cell {
+    background: var(--bg-elev);
+    padding: 10px 14px;
+    min-width: 0; /* permite que el contenido largo se rompa dentro de la grid */
+  }
+  .meta-cell.span-2  { grid-column: span 2; }
+  .meta-cell.span-4  { grid-column: span 4; }
+  .meta-cell.span-6  { grid-column: span 6; }
+  .meta-cell.span-8  { grid-column: span 8; }
+  .meta-cell.span-12 { grid-column: span 12; }
+  @media (max-width: 720px) {
+    .meta-cell.span-2, .meta-cell.span-4, .meta-cell.span-6,
+    .meta-cell.span-8, .meta-cell.span-12 { grid-column: span 12; }
+  }
+  .meta-label {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+  }
+  .meta-value {
+    font-size: 13px;
+    color: var(--text);
+    font-family: var(--mono);
+  }
+  .meta-value.vector {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+  .meta-value.dim { color: var(--text-dim); }
+  .vex-block {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: rgba(76,212,212,0.05);
+    border: 1px solid rgba(76,212,212,0.2);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* ---------- KEV badges & block ---------- */
+  .kev-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 500;
+    padding: 4px 10px;
+    background: var(--crit);
+    color: #1a0507;
+    border: 1px solid var(--crit);
+    box-shadow: 0 0 12px rgba(255,77,94,0.45);
+    animation: kevPulse 2.4s ease-in-out infinite;
+  }
+  .kev-badge.ransomware {
+    background: #ff2032;
+    border-color: #ff2032;
+    box-shadow: 0 0 16px rgba(255,32,50,0.6);
+  }
+  @keyframes kevPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(255,77,94,0.35); }
+    50%      { box-shadow: 0 0 16px rgba(255,77,94,0.7); }
+  }
+  .kev-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px; height: 18px;
+    background: var(--crit);
+    color: #1a0507;
+    font-weight: 700;
+    font-size: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    cursor: help;
+    box-shadow: 0 0 6px rgba(255,77,94,0.5);
+  }
+  .kev-icon.ransomware { background: #ff2032; }
+  .kev-block {
+    margin-top: 12px;
+    padding: 14px 16px;
+    background: rgba(255,77,94,0.06);
+    border: 1px solid rgba(255,77,94,0.35);
+    border-left: 3px solid var(--crit);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .kev-block .kev-title {
+    color: var(--crit);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 11px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .kev-block .kev-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 18px;
+    margin-bottom: 8px;
+  }
+  .kev-block .kev-field {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .kev-block .kev-field-label {
+    font-size: 9.5px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+  }
+  .kev-block .kev-field-value {
+    font-size: 12.5px;
+    color: var(--text);
+    font-family: var(--mono);
+  }
+  .kev-block .kev-field-value.danger {
+    color: #ff7a87;
+    font-weight: 500;
+  }
+  .kev-block .kev-notes {
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,77,94,0.2);
+    font-style: italic;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .vex-block strong {
+    color: var(--accent-2);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 10.5px;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .vuln-refs {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 11px;
+  }
+  .vuln-refs a {
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+  }
+  .vuln-refs a:hover {
+    color: var(--accent-2);
+    border-color: var(--accent-2);
+  }
+  .no-vulns {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 8px 0;
+  }
+  .pkg-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .pkg-detail-grid .meta-label { margin-bottom: 6px; }
+  .pkg-detail-grid .meta-value { font-size: 12.5px; word-break: break-all; }
+
+  /* ---------- ALERTS ---------- */
+  .alert {
+    padding: 14px 18px;
+    border: 1px solid;
+    margin-bottom: 20px;
+    font-size: 12px;
+    display: none;
+  }
+  .alert.shown { display: block; }
+  .alert.error  { color: var(--crit); border-color: var(--crit); background: rgba(255,77,94,0.06); }
+  .alert.info   { color: var(--accent-2); border-color: rgba(76,212,212,0.4); background: rgba(76,212,212,0.05); }
+
+  /* ---------- TABS ---------- */
+  .tabs {
+    display: none;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+    gap: 0;
+  }
+  .tabs.shown { display: flex; }
+  .tab {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    padding: 14px 22px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text-dim); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab .count {
+    margin-left: 8px;
+    color: var(--text-faint);
+    font-size: 10px;
+  }
+  .tab.active .count { color: var(--accent); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ---------- EPSS RANKING ---------- */
+  .epss-intro {
+    padding: 16px 18px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    margin: 18px 0 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .epss-intro strong {
+    color: var(--accent-2);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 10.5px;
+    display: block;
+    margin-bottom: 6px;
+  }
+  td.epss-rank {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--text-faint);
+    font-weight: 400;
+    width: 50px;
+  }
+  td.epss-cve {
+    font-weight: 500;
+    color: var(--accent);
+  }
+  td.epss-cve a { color: inherit; text-decoration: none; }
+  td.epss-cve a:hover { text-decoration: underline; }
+  .epss-bar {
+    position: relative;
+    height: 22px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-soft);
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 11px;
+    font-family: var(--mono);
+    overflow: hidden;
+  }
+  .epss-bar .fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: linear-gradient(90deg,
+      rgba(255,179,64,0.18),
+      rgba(255,77,94,0.25));
+    z-index: 0;
+  }
+  .epss-bar .label { position: relative; z-index: 1; color: var(--text); }
+  .epss-empty {
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    font-size: 12.5px;
+  }
+  .diag {
+    display: none;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    background: #0a0c0d;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .diag.shown { display: block; }
+  .diag-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--text-faint);
+    background: var(--bg-elev-2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .diag-clear {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 10px;
+    background: none;
+    border: none;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .diag-clear:hover { color: var(--accent); }
+  .diag-body {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-family: var(--mono);
+    line-height: 1.7;
+  }
+  .diag-line {
+    color: var(--text-dim);
+    padding: 2px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .diag-line.ok   { color: var(--low); }
+  .diag-line.warn { color: var(--med); }
+  .diag-line.err  { color: var(--crit); }
+  .diag-line .ts {
+    color: var(--text-faint);
+    margin-right: 8px;
+  }
+
+  /* ---------- FOOTER ---------- */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 32px;
+    color: var(--text-faint);
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  footer a { color: var(--text-dim); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+
+  /* ---------- SCROLLBAR ---------- */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="mark">sbom<em>scope</em></span>
+    <span class="tag">vulnerability intelligence</span>
+  </div>
+  <div class="status-pill"><span class="dot"></span> OSV · EPSS · NVD · CISA KEV online</div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="intro">
+      <h1>Análisis de <em>SBOM</em> con cruce de vulnerabilidades en tiempo real.</h1>
+      <p>Carga un Software Bill of Materials en formato CycloneDX o SPDX. Extraemos cada paquete, lo cruzamos con OSV.dev, calculamos su EPSS desde FIRST, traemos el CVSS y la descripción desde NVD, y leemos la información VEX embebida en tu SBOM si está disponible.</p>
+      <div class="meta">
+        <span>CycloneDX 1.4+</span>
+        <span>SPDX 2.x / 3.x</span>
+        <span>JSON · XML · SPDX-Tag</span>
+      </div>
+    </div>
+
+    <label class="dropzone" id="dropzone" for="fileInput">
+      <span class="corner tl"></span><span class="corner tr"></span>
+      <span class="corner bl"></span><span class="corner br"></span>
+      <div class="dropzone-label">▸ Input · drag &amp; drop o click</div>
+      <div class="dropzone-main" id="dzMain">Suelta aquí tu archivo SBOM</div>
+      <div class="dropzone-sub" id="dzSub">.json · .xml · .spdx · .cdx.json</div>
+      <div class="dropzone-formats">
+        <span class="format-chip">CycloneDX</span>
+        <span class="format-chip">SPDX</span>
+      </div>
+      <input type="file" id="fileInput" accept=".json,.xml,.spdx,.cdx,application/json,text/xml" />
+    </label>
+  </section>
+
+  <div class="alert error" id="errBox"></div>
+  <div class="alert info"  id="infoBox"></div>
+
+  <div class="controls">
+    <button class="primary" id="scanBtn" disabled>▶ Iniciar escaneo de vulnerabilidades</button>
+    <button class="ghost" id="resetBtn" style="display:none;">Reiniciar</button>
+    <div class="progress" id="progress">
+      <span class="spinner"></span>
+      <span id="progressText">Consultando bases de datos…</span>
+    </div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="diag" id="diag">
+    <div class="diag-header">
+      <span>▸ Log de diagnóstico</span>
+      <button class="diag-clear" id="diagClear">Limpiar</button>
+    </div>
+    <div class="diag-body" id="diagBody"></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-panel="packages">Paquetes <span class="count" id="countPkgs"></span></button>
+    <button class="tab" data-panel="epss">Top EPSS <span class="count" id="countEpss"></span></button>
+  </div>
+
+  <div class="panel active" id="panelPackages">
+    <div class="filters" id="filters">
+      <span class="filter-label">Filtrar:</span>
+      <button class="filter-btn active" data-filter="all">Todos</button>
+      <button class="filter-btn" data-filter="vulnerable">Vulnerables</button>
+      <button class="filter-btn" data-filter="kev" style="color:var(--crit);border-color:rgba(255,77,94,0.4);">⚠ KEV</button>
+      <button class="filter-btn" data-filter="critical">Crítico</button>
+      <button class="filter-btn" data-filter="high">Alto</button>
+      <button class="filter-btn" data-filter="medium">Medio</button>
+      <button class="filter-btn" data-filter="low">Bajo</button>
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar paquete o CVE…" />
+    </div>
+
+    <div class="results" id="results">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Paquete</th>
+              <th>Versión</th>
+              <th>Ecosistema</th>
+              <th>Severidad máx.</th>
+              <th>CVSS</th>
+              <th>EPSS</th>
+              <th># Vulns</th>
+              <th>VEX / KEV</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panelEpss">
+    <div class="epss-intro">
+      <strong>▸ Exploit Prediction Scoring System</strong>
+      El EPSS estima la probabilidad de que una vulnerabilidad sea explotada en los próximos 30 días, basado en datos del mundo real. Un score de 0.50 significa 50% de probabilidad. El percentil indica dónde se sitúa frente al resto de CVEs registrados.
+    </div>
+    <div class="filters" id="epssFilters">
+      <span class="filter-label">Umbral:</span>
+      <button class="filter-btn active" data-epss-filter="all">Todos</button>
+      <button class="filter-btn" data-epss-filter="0.01">≥ 1%</button>
+      <button class="filter-btn" data-epss-filter="0.1">≥ 10%</button>
+      <button class="filter-btn" data-epss-filter="0.5">≥ 50%</button>
+      <input type="text" class="search-input" id="epssSearch" placeholder="Buscar CVE o paquete…" />
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:50px;">#</th>
+            <th>CVE</th>
+            <th>Paquete afectado</th>
+            <th style="width:200px;">EPSS Score</th>
+            <th>Percentil</th>
+            <th>CVSS</th>
+            <th>Severidad</th>
+          </tr>
+        </thead>
+        <tbody id="epssTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div>SBOMscope · análisis local en el navegador · ningún archivo se sube a servidores propios.</div>
+  <div>Datos: <a href="https://osv.dev" target="_blank" rel="noopener">OSV.dev</a> · <a href="https://www.first.org/epss/" target="_blank" rel="noopener">FIRST EPSS</a> · <a href="https://nvd.nist.gov" target="_blank" rel="noopener">NVD</a> · <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog" target="_blank" rel="noopener">CISA KEV</a></div>
+</footer>
+
+<script>
+/* =========================================================================
+   SBOMscope — single-file analyzer
+   - Parseo CycloneDX (JSON + XML) y SPDX (JSON + tag-value)
+   - Cruce con OSV.dev (vulnerabilidades + severidad CVSS si la trae)
+   - Enriquecimiento con FIRST EPSS (score + percentil)
+   - Lectura de VEX embebido (CycloneDX vulnerabilities[].analysis)
+   - Descripción / CVSS desde NVD para CVEs sin info en OSV
+   ========================================================================= */
+
+const $ = (sel) => document.querySelector(sel);
+const tbody = $("#tableBody");
+
+let parsedPackages = [];   // {name, version, ecosystem, purl, ref, raw}
+let sbomVexMap = new Map(); // id (CVE / GHSA) -> VEX info from CycloneDX
+let scanResults = [];      // [{pkg, vulns: [...]}]
+let activeFilter = "all";
+let searchQuery = "";
+
+/* ---------- UI helpers ---------- */
+function showError(msg) {
+  const el = $("#errBox");
+  el.textContent = "✕  " + msg;
+  el.classList.add("shown");
+  setTimeout(()=>el.classList.remove("shown"), 8000);
+}
+function showInfo(msg) {
+  const el = $("#infoBox");
+  el.textContent = "ℹ  " + msg;
+  el.classList.add("shown");
+}
+function hideInfo() { $("#infoBox").classList.remove("shown"); }
+
+/* ---------- Diagnostic log ---------- */
+function log(msg, level = "info") {
+  const diag = $("#diag");
+  const body = $("#diagBody");
+  diag.classList.add("shown");
+  const ts = new Date().toLocaleTimeString("es-MX", { hour12: false });
+  const line = document.createElement("div");
+  line.className = "diag-line " + (level === "info" ? "" : level);
+  line.innerHTML = `<span class="ts">${ts}</span>${escapeHtmlBasic(msg)}`;
+  body.appendChild(line);
+  body.parentElement.scrollTop = body.parentElement.scrollHeight;
+  // Also mirror to console for power users
+  const c = { ok: "log", warn: "warn", err: "error", info: "log" }[level] || "log";
+  console[c]("[SBOMscope]", msg);
+}
+function escapeHtmlBasic(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  }[c]));
+}
+$("#diagClear").addEventListener("click", () => { $("#diagBody").innerHTML = ""; });
+// Surface any uncaught errors
+window.addEventListener("error", e => log("Error JS: " + (e.message || e), "err"));
+window.addEventListener("unhandledrejection", e => log("Promise rechazada: " + (e.reason?.message || e.reason || e), "err"));
+
+/* ---------- Network preflight ---------- */
+async function preflightCheck() {
+  log("Verificando conectividad con OSV.dev…");
+  try {
+    const r = await fetch("https://api.osv.dev/v1/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ package: { purl: "pkg:npm/lodash@4.17.15" } })
+    });
+    if (!r.ok) {
+      log(`OSV respondió HTTP ${r.status}. Las consultas podrían fallar.`, "warn");
+      return false;
+    }
+    const data = await r.json();
+    const n = (data.vulns || []).length;
+    log(`OSV OK · respuesta de prueba: ${n} vulns para lodash 4.17.15`, "ok");
+    return true;
+  } catch (e) {
+    const isFile = location.protocol === "file:";
+    if (isFile) {
+      log("Error de red al consultar OSV. Estás abriendo el archivo con file:// — el navegador bloquea fetch() a APIs externas desde este origen.", "err");
+      log("Solución: sirve el archivo con `python3 -m http.server` y abre http://localhost:8000/sbom-analyzer.html", "warn");
+    } else {
+      log("Error de red al consultar OSV: " + (e.message || e), "err");
+    }
+    return false;
+  }
+}
+
+/* ---------- File handling ---------- */
+const dz = $("#dropzone");
+const fileInput = $("#fileInput");
+["dragenter","dragover"].forEach(ev =>
+  dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("dragover"); })
+);
+["dragleave","drop"].forEach(ev =>
+  dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("dragover"); })
+);
+dz.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fileInput.addEventListener("change", e => {
+  const f = e.target.files[0];
+  if (f) handleFile(f);
+});
+
+async function handleFile(file) {
+  hideInfo();
+  $("#errBox").classList.remove("shown");
+  $("#dzMain").textContent = file.name;
+  $("#dzSub").textContent = `${(file.size/1024).toFixed(1)} KB · leyendo…`;
+  log(`Archivo cargado: ${file.name} (${(file.size/1024).toFixed(1)} KB)`);
+
+  try {
+    const text = await file.text();
+    const result = parseSBOM(text, file.name);
+    parsedPackages = result.packages;
+    sbomVexMap = result.vexMap;
+    log(`Parseo OK · formato: ${result.format} · paquetes: ${parsedPackages.length} · VEX: ${sbomVexMap.size}`, "ok");
+
+    if (parsedPackages.length === 0) {
+      showError("No se encontraron paquetes en el archivo.");
+      $("#dzSub").textContent = "Sin paquetes encontrados.";
+      return;
+    }
+    $("#dzSub").textContent = `${result.format} · ${parsedPackages.length} paquetes detectados`;
+    $("#scanBtn").disabled = false;
+    showInfo(`Formato detectado: ${result.format}. ${parsedPackages.length} paquetes listos para análisis. ${sbomVexMap.size ? sbomVexMap.size + ' entradas VEX embebidas detectadas.' : ''}`);
+
+    // Render preview table without vuln data yet
+    scanResults = parsedPackages.map(p => ({ pkg: p, vulns: [], scanned: false }));
+    renderTable();
+  } catch (err) {
+    console.error(err);
+    showError("Error al parsear el archivo: " + err.message);
+    $("#dzSub").textContent = "Error al leer.";
+  }
+}
+
+/* =========================================================================
+   PARSING
+   ========================================================================= */
+function parseSBOM(text, filename) {
+  const trimmed = text.trim();
+
+  // JSON path
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    let obj;
+    try { obj = JSON.parse(trimmed); }
+    catch (e) { throw new Error("JSON inválido: " + e.message); }
+
+    if (obj.bomFormat === "CycloneDX" || obj.specVersion && obj.components) {
+      return parseCycloneDXJson(obj);
+    }
+    if (obj.spdxVersion || obj.SPDXID) {
+      return parseSpdxJson(obj);
+    }
+    // Heuristic
+    if (obj.components) return parseCycloneDXJson(obj);
+    if (obj.packages)   return parseSpdxJson(obj);
+    throw new Error("Formato JSON no reconocido (no parece CycloneDX ni SPDX).");
+  }
+
+  // XML CycloneDX
+  if (trimmed.startsWith("<")) {
+    return parseCycloneDXXml(trimmed);
+  }
+
+  // SPDX tag-value
+  if (trimmed.includes("SPDXVersion") || trimmed.includes("PackageName:")) {
+    return parseSpdxTagValue(trimmed);
+  }
+
+  throw new Error("Formato no detectado. Acepta CycloneDX (JSON/XML) y SPDX (JSON/tag-value).");
+}
+
+/* ----- CycloneDX JSON ----- */
+function parseCycloneDXJson(obj) {
+  const packages = [];
+  const comps = obj.components || [];
+  for (const c of comps) {
+    const purl = c.purl || "";
+    const eco = ecosystemFromPurl(purl) || mapCdxTypeToEco(c.type);
+    packages.push({
+      name: c.name || "(sin nombre)",
+      version: c.version || "",
+      ecosystem: eco || "unknown",
+      purl,
+      ref: c["bom-ref"] || purl || c.name,
+      type: c.type || "",
+      raw: c
+    });
+  }
+  // VEX embebido en CycloneDX
+  const vexMap = new Map();
+  const vulns = obj.vulnerabilities || [];
+  for (const v of vulns) {
+    const id = v.id;
+    if (!id) continue;
+    const entry = {
+      analysis: v.analysis || null,
+      state: v.analysis?.state || null,
+      justification: v.analysis?.justification || null,
+      detail: v.analysis?.detail || v.analysis?.response?.join?.(", ") || null,
+      affects: (v.affects || []).map(a => a.ref).filter(Boolean)
+    };
+    vexMap.set(id.toUpperCase(), entry);
+    if (v.references) {
+      for (const r of v.references) {
+        if (r.id) vexMap.set(r.id.toUpperCase(), entry);
+      }
+    }
+  }
+  return { format: `CycloneDX ${obj.specVersion || ""} (JSON)`.trim(), packages, vexMap };
+}
+
+/* ----- CycloneDX XML ----- */
+function parseCycloneDXXml(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, "application/xml");
+  if (doc.querySelector("parsererror")) {
+    throw new Error("XML inválido.");
+  }
+  const packages = [];
+  const comps = doc.getElementsByTagName("component");
+  for (const c of comps) {
+    const name = c.getElementsByTagName("name")[0]?.textContent || "(sin nombre)";
+    const version = c.getElementsByTagName("version")[0]?.textContent || "";
+    const purl = c.getElementsByTagName("purl")[0]?.textContent || "";
+    const type = c.getAttribute("type") || "";
+    const bomRef = c.getAttribute("bom-ref") || "";
+    packages.push({
+      name, version,
+      ecosystem: ecosystemFromPurl(purl) || mapCdxTypeToEco(type) || "unknown",
+      purl, ref: bomRef || purl || name, type, raw: null
+    });
+  }
+  // VEX in XML
+  const vexMap = new Map();
+  const vulns = doc.getElementsByTagName("vulnerability");
+  for (const v of vulns) {
+    const id = v.getElementsByTagName("id")[0]?.textContent;
+    if (!id) continue;
+    const analysisEl = v.getElementsByTagName("analysis")[0];
+    const entry = {
+      state: analysisEl?.getElementsByTagName("state")[0]?.textContent || null,
+      justification: analysisEl?.getElementsByTagName("justification")[0]?.textContent || null,
+      detail: analysisEl?.getElementsByTagName("detail")[0]?.textContent || null,
+      affects: []
+    };
+    vexMap.set(id.toUpperCase(), entry);
+  }
+  const specVer = doc.documentElement.getAttribute("version") || doc.documentElement.getAttribute("specVersion") || "";
+  return { format: `CycloneDX ${specVer} (XML)`.trim(), packages, vexMap };
+}
+
+/* ----- SPDX JSON ----- */
+function parseSpdxJson(obj) {
+  const packages = [];
+  const pkgs = obj.packages || [];
+  for (const p of pkgs) {
+    let purl = "";
+    let eco = "";
+    if (Array.isArray(p.externalRefs)) {
+      for (const r of p.externalRefs) {
+        if ((r.referenceType || "").toLowerCase() === "purl") {
+          purl = r.referenceLocator;
+          eco = ecosystemFromPurl(purl);
+          break;
+        }
+      }
+    }
+    packages.push({
+      name: p.name || "(sin nombre)",
+      version: p.versionInfo || "",
+      ecosystem: eco || guessEcoFromSpdx(p) || "unknown",
+      purl,
+      ref: p.SPDXID || p.name,
+      type: "",
+      raw: p
+    });
+  }
+  return { format: `SPDX ${obj.spdxVersion || ""} (JSON)`.trim(), packages, vexMap: new Map() };
+}
+
+/* ----- SPDX tag-value ----- */
+function parseSpdxTagValue(text) {
+  const packages = [];
+  const blocks = text.split(/\n\s*\n/);
+  let spdxVer = "";
+  for (const b of blocks) {
+    const lines = b.split("\n");
+    if (!spdxVer) {
+      const m = b.match(/SPDXVersion:\s*(\S+)/);
+      if (m) spdxVer = m[1];
+    }
+    if (!/PackageName:/.test(b)) continue;
+    const get = (key) => {
+      const r = b.match(new RegExp("^" + key + ":\\s*(.+)$", "m"));
+      return r ? r[1].trim() : "";
+    };
+    const name = get("PackageName");
+    if (!name) continue;
+    const version = get("PackageVersion");
+    let purl = "";
+    const ext = b.match(/ExternalRef:\s*PACKAGE-MANAGER\s+purl\s+(\S+)/i);
+    if (ext) purl = ext[1];
+    packages.push({
+      name, version,
+      ecosystem: ecosystemFromPurl(purl) || "unknown",
+      purl, ref: get("SPDXID") || name, type: "", raw: null
+    });
+  }
+  return { format: `SPDX ${spdxVer} (tag-value)`.trim(), packages, vexMap: new Map() };
+}
+
+/* ---------- Helpers ---------- */
+function ecosystemFromPurl(purl) {
+  if (!purl) return "";
+  const m = purl.match(/^pkg:([^/]+)\//);
+  if (!m) return "";
+  const t = m[1].toLowerCase();
+  // Map PURL types -> OSV ecosystem names
+  const map = {
+    "npm": "npm",
+    "pypi": "PyPI",
+    "maven": "Maven",
+    "gem": "RubyGems",
+    "cargo": "crates.io",
+    "nuget": "NuGet",
+    "golang": "Go",
+    "go": "Go",
+    "composer": "Packagist",
+    "hex": "Hex",
+    "pub": "Pub",
+    "swift": "SwiftURL",
+    "deb": "Debian",
+    "rpm": "Red Hat",
+    "apk": "Alpine",
+    "github": "GitHub Actions"
+  };
+  return map[t] || t;
+}
+function mapCdxTypeToEco(t) {
+  // CycloneDX 'type' is library/application/operating-system... not ecosystem.
+  return "";
+}
+function guessEcoFromSpdx(p) {
+  const dl = (p.downloadLocation || "").toLowerCase();
+  if (dl.includes("npmjs"))  return "npm";
+  if (dl.includes("pypi"))   return "PyPI";
+  if (dl.includes("maven"))  return "Maven";
+  if (dl.includes("rubygems")) return "RubyGems";
+  return "";
+}
+
+/* =========================================================================
+   SCAN — consultas a OSV, EPSS y NVD
+   ========================================================================= */
+$("#scanBtn").addEventListener("click", runScan);
+$("#resetBtn").addEventListener("click", () => location.reload());
+
+async function runScan() {
+  $("#scanBtn").disabled = true;
+  $("#resetBtn").style.display = "inline-block";
+  $("#progress").classList.add("active");
+  hideInfo();
+  osvStats = { ok: 0, fail: 0, empty: 0, hits: 0 };
+
+  // ---------- 0) Preflight: verificar que las APIs respondan ----------
+  $("#progressText").textContent = "Verificando conectividad…";
+  const reachable = await preflightCheck();
+  if (!reachable) {
+    log("Continuando de todos modos, pero las consultas probablemente fallen.", "warn");
+  }
+
+  const total = parsedPackages.length;
+  let done = 0;
+  const BATCH = 8;
+
+  // Lanzar la descarga del catálogo KEV en paralelo con OSV — no la esperamos
+  // aquí; se resuelve mientras se procesan los lotes y se await después.
+  log("Descargando catálogo CISA KEV en segundo plano…");
+  const kevPromise = queryKEV();
+
+  // ---------- 1) OSV bulk query ----------
+  log(`Iniciando escaneo OSV para ${total} paquetes (lotes de ${BATCH})…`);
+  $("#progressText").textContent = `Consultando OSV.dev (0/${total})…`;
+  scanResults = parsedPackages.map(p => ({ pkg: p, vulns: [], scanned: false }));
+
+  for (let i = 0; i < parsedPackages.length; i += BATCH) {
+    const slice = parsedPackages.slice(i, i + BATCH);
+    await Promise.all(slice.map(async (pkg, idx) => {
+      const idxGlobal = i + idx;
+      const vulns = await queryOSV(pkg);
+      scanResults[idxGlobal].vulns = vulns;
+      scanResults[idxGlobal].scanned = true;
+      done++;
+      $("#progressText").textContent = `Consultando OSV.dev (${done}/${total})…`;
+    }));
+  }
+  log(`OSV completado · ${osvStats.ok} respuestas OK, ${osvStats.fail} fallos, ${osvStats.hits} vulnerabilidades encontradas en total.`, osvStats.fail > 0 ? "warn" : "ok");
+
+  if (osvStats.fail === total) {
+    log("Todas las consultas a OSV fallaron. Revisa el log de arriba para ver la causa exacta.", "err");
+  }
+
+  // ---------- 2) Recopilar todos los CVEs únicos ----------
+  const cveSet = new Set();
+  for (const r of scanResults) {
+    for (const v of r.vulns) {
+      const cves = extractCVEs(v);
+      cves.forEach(c => cveSet.add(c));
+    }
+  }
+  const cveArr = [...cveSet];
+
+  // ---------- 3) EPSS ----------
+  let epssMap = new Map();
+  if (cveArr.length) {
+    $("#progressText").textContent = `Consultando FIRST EPSS (${cveArr.length} CVEs)…`;
+    log(`Consultando EPSS para ${cveArr.length} CVE${cveArr.length>1?"s":""} únicos…`);
+    epssMap = await queryEPSS(cveArr);
+    log(`EPSS · ${epssMap.size}/${cveArr.length} CVEs con score`, epssMap.size ? "ok" : "warn");
+  } else {
+    log("Sin CVEs para consultar a EPSS.", "warn");
+  }
+
+  // ---------- 4) NVD (sólo si la vuln no tiene summary/cvss desde OSV) ----------
+  $("#progressText").textContent = `Enriqueciendo desde NVD…`;
+  const nvdMap = new Map();
+  // Recopilar CVEs que necesitan datos NVD
+  const needsNvd = [];
+  for (const r of scanResults) {
+    for (const v of r.vulns) {
+      const cves = extractCVEs(v);
+      for (const c of cves) {
+        const hasSummary = (v.summary && v.summary.length > 20) || (v.details && v.details.length > 40);
+        const hasCvss = !!v.cvssScore;
+        if (!hasSummary || !hasCvss) needsNvd.push(c);
+      }
+    }
+  }
+  const uniqNvd = [...new Set(needsNvd)].slice(0, 25); // límite suave para no saturar
+  if (uniqNvd.length) log(`Enriqueciendo ${uniqNvd.length} CVE${uniqNvd.length>1?"s":""} desde NVD (rate-limit suave)…`);
+  for (const cve of uniqNvd) {
+    try {
+      const data = await queryNVD(cve);
+      if (data) nvdMap.set(cve, data);
+    } catch (e) { /* ignorar individual */ }
+  }
+  if (uniqNvd.length) log(`NVD · ${nvdMap.size}/${uniqNvd.length} CVEs enriquecidos`, nvdMap.size ? "ok" : "warn");
+
+  // ---------- 4.5) Esperar al catálogo KEV (lanzado en paralelo al inicio) ----------
+  $("#progressText").textContent = "Cruzando con CISA KEV…";
+  const kevMap = await kevPromise;
+  let kevHits = 0;
+
+  // ---------- 5) Mezclar EPSS + NVD + VEX + KEV en cada vuln ----------
+  for (const r of scanResults) {
+    for (const v of r.vulns) {
+      const cves = extractCVEs(v);
+      // EPSS: tomar el más alto si hay varios
+      let bestEpss = null;
+      for (const c of cves) {
+        const e = epssMap.get(c);
+        if (e && (!bestEpss || e.epss > bestEpss.epss)) bestEpss = e;
+      }
+      v.epss = bestEpss;
+
+      // NVD enrichment
+      for (const c of cves) {
+        const n = nvdMap.get(c);
+        if (n) {
+          if (!v.summary || v.summary.length < 20) v.summary = n.description || v.summary;
+          if (!v.cvssScore && n.cvssScore) {
+            v.cvssScore = n.cvssScore;
+            v.cvssVector = n.cvssVector;
+            v.cvssVersion = n.cvssVersion;
+            v.severity = severityFromScore(n.cvssScore);
+          }
+          v._nvd = n;
+          break;
+        }
+      }
+
+      // VEX: buscar por todos los IDs/aliases
+      const allIds = [v.id, ...(v.aliases || [])].filter(Boolean).map(s => s.toUpperCase());
+      for (const id of allIds) {
+        if (sbomVexMap.has(id)) {
+          v.vex = sbomVexMap.get(id);
+          break;
+        }
+      }
+
+      // KEV: match por CVE en el catálogo de CISA
+      for (const c of cves) {
+        if (kevMap.has(c)) {
+          v.kev = kevMap.get(c);
+          kevHits++;
+          break;
+        }
+      }
+    }
+  }
+  if (kevMap.size > 0) {
+    log(`CISA KEV match · ${kevHits} vulnerabilidad${kevHits===1?'':'es'} en explotación activa`, kevHits ? "err" : "ok");
+  }
+
+  $("#progress").classList.remove("active");
+  $("#scanBtn").disabled = false;
+  $("#scanBtn").textContent = "✓ Re-escanear";
+  renderSummary();
+  renderTable();
+  // Construir y mostrar ranking EPSS
+  epssRows = buildEpssRows();
+  renderEpssTable();
+  $("#countPkgs").textContent = `· ${scanResults.length}`;
+  $("#tabs").classList.add("shown");
+  $("#filters").classList.add("shown");
+  $("#epssFilters").classList.add("shown");
+  $("#results").classList.add("shown");
+}
+
+/* ---------- OSV query ---------- */
+let osvStats = { ok: 0, fail: 0, empty: 0, hits: 0 };
+
+async function queryOSV(pkg) {
+  // Necesitamos al menos nombre + versión, idealmente ecosistema
+  if (!pkg.name || !pkg.version) {
+    log(`OSV skip · ${pkg.name||"(?)"} sin nombre o versión`, "warn");
+    osvStats.empty++;
+    return [];
+  }
+  // Si tenemos purl, OSV soporta consulta por purl (más preciso)
+  let body;
+  if (pkg.purl) {
+    body = { package: { purl: pkg.purl } };
+  } else {
+    body = {
+      version: pkg.version,
+      package: {
+        name: pkg.name,
+        ...(pkg.ecosystem && pkg.ecosystem !== "unknown" ? { ecosystem: pkg.ecosystem } : {})
+      }
+    };
+  }
+  try {
+    const res = await fetch("https://api.osv.dev/v1/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      osvStats.fail++;
+      log(`OSV HTTP ${res.status} para ${pkg.name}@${pkg.version}`, "err");
+      return [];
+    }
+    const data = await res.json();
+    const list = data.vulns || [];
+    osvStats.ok++;
+    if (list.length) {
+      osvStats.hits += list.length;
+      log(`OSV · ${pkg.name}@${pkg.version} → ${list.length} vuln${list.length>1?"s":""}: ${list.slice(0,3).map(v=>v.id).join(", ")}${list.length>3?"…":""}`, "ok");
+    }
+    return list.map(normaliseOSVVuln);
+  } catch (e) {
+    osvStats.fail++;
+    log(`OSV ERROR para ${pkg.name}@${pkg.version}: ${e.message || e}`, "err");
+    return [];
+  }
+}
+
+function normaliseOSVVuln(v) {
+  // OSV puede devolver varios entries en `severity` (v3.1 y v4.0, etc.).
+  // Preferimos la versión más nueva con score válido.
+  let cvssScore = null, cvssVector = null, cvssVersion = null;
+  const versionRank = t => {
+    if (!t) return 0;
+    if (t.includes("V4")) return 4;
+    if (t.includes("V3"))  return 3;
+    if (t.includes("V2"))  return 2;
+    return 1;
+  };
+  if (Array.isArray(v.severity)) {
+    let bestRank = -1;
+    for (const s of v.severity) {
+      if (!s.score || !s.type || !s.type.startsWith("CVSS")) continue;
+      const rank = versionRank(s.type);
+      const parsed = parseCvssVectorScore(s.score);
+      if (parsed != null && rank > bestRank) {
+        bestRank = rank;
+        cvssScore = parsed;
+        cvssVector = s.score;
+        cvssVersion = s.type;
+      }
+    }
+  }
+  // Algunos advisories (sobre todo GHSA) traen el score en database_specific.cvss
+  if (cvssScore == null && v.database_specific?.cvss?.score != null) {
+    const x = parseFloat(v.database_specific.cvss.score);
+    if (!isNaN(x) && x >= 0 && x <= 10) {
+      cvssScore = x;
+      cvssVector = v.database_specific.cvss.vector_string || cvssVector;
+    }
+  }
+  // Severity textual desde database_specific (GHSA: "CRITICAL", "HIGH"…)
+  let textSev = null;
+  if (v.database_specific?.severity) textSev = v.database_specific.severity;
+  if (!textSev && v.severity?.[0]?.score && cvssScore != null) textSev = severityFromScore(cvssScore);
+
+  return {
+    id: v.id,
+    aliases: v.aliases || [],
+    summary: v.summary || "",
+    details: v.details || "",
+    published: v.published || v.modified || "",
+    cvssScore,
+    cvssVector,
+    cvssVersion,
+    severity: severityFromScore(cvssScore) || normaliseSev(textSev),
+    references: (v.references || []).map(r => ({ type: r.type, url: r.url })),
+    affected: extractAffectedRanges(v),
+    fixed: extractFixedVersions(v),
+    epss: null,
+    vex: null
+  };
+}
+
+function extractAffectedRanges(v) {
+  const out = [];
+  for (const a of (v.affected || [])) {
+    // Caso 1: rangos con events (formato preferido por OSV)
+    for (const r of (a.ranges || [])) {
+      // Ignoramos rangos de tipo GIT (commits hashes no son legibles).
+      if (r.type === "GIT") continue;
+      // Procesar events en orden: introduced → fixed/last_affected/limit
+      const events = r.events || [];
+      let intro = null;
+      for (const e of events) {
+        if (e.introduced != null) {
+          intro = e.introduced;
+        } else if (e.fixed != null) {
+          out.push(formatRange(intro, e.fixed, "fixed"));
+          intro = null;
+        } else if (e.last_affected != null) {
+          out.push(formatRange(intro, e.last_affected, "last_affected"));
+          intro = null;
+        } else if (e.limit != null) {
+          out.push(formatRange(intro, e.limit, "limit"));
+          intro = null;
+        }
+      }
+      // Si quedó un "introduced" sin cierre, es "todo desde X en adelante (sin parche)"
+      if (intro != null) {
+        out.push(intro === "0" ? "todas las versiones" : `≥ ${intro} (sin parche)`);
+      }
+    }
+    // Caso 2: lista explícita `versions` sin rangos
+    if ((!a.ranges || a.ranges.length === 0) && Array.isArray(a.versions) && a.versions.length) {
+      const vs = a.versions;
+      if (vs.length <= 3) {
+        out.push(vs.join(", "));
+      } else {
+        out.push(`${vs[0]} … ${vs[vs.length - 1]} (${vs.length} versiones)`);
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+
+function formatRange(intro, upper, kind) {
+  // intro "0" es el comodín de OSV para "desde el principio"
+  const fromAll = intro === null || intro === "0" || intro === undefined;
+  if (kind === "fixed") {
+    // upper es la primera versión NO afectada
+    return fromAll ? `< ${upper}` : `≥ ${intro}, < ${upper}`;
+  }
+  if (kind === "last_affected") {
+    return fromAll ? `≤ ${upper}` : `${intro} – ${upper}`;
+  }
+  // limit es un cierre semi-abierto al igual que fixed
+  return fromAll ? `< ${upper}` : `${intro} – ${upper}`;
+}
+
+function extractFixedVersions(v) {
+  const out = [];
+  for (const a of (v.affected || [])) {
+    for (const r of (a.ranges || [])) {
+      for (const e of (r.events || [])) {
+        if (e.fixed) out.push(e.fixed);
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+
+/* =========================================================================
+   CVSS calculator — implementa las fórmulas oficiales de FIRST
+   - CVSS v3.0 / v3.1: spec en https://www.first.org/cvss/v3.1/specification-document
+   - CVSS v2.0: spec en https://www.first.org/cvss/v2/guide
+   - CVSS v4.0: cálculo simplificado (la fórmula completa usa lookup tables
+     de 270+ entradas; usamos una aproximación basada en métricas base).
+   El vector llega como "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H".
+   ========================================================================= */
+function parseCvssVectorScore(vec) {
+  if (!vec || typeof vec !== "string") return null;
+
+  // Si por casualidad ya viene con score numérico al final, úsalo.
+  const tail = vec.match(/\b(\d{1,2}(?:\.\d)?)\s*$/);
+  if (tail && !vec.includes("/")) {
+    const n = parseFloat(tail[1]);
+    if (n >= 0 && n <= 10) return n;
+  }
+
+  // Partir el vector y construir un mapa de métricas.
+  const parts = vec.split("/").filter(Boolean);
+  const m = {};
+  let version = null;
+  for (const p of parts) {
+    if (p.startsWith("CVSS:")) {
+      version = p.slice(5);  // "3.1", "3.0", "4.0"
+      continue;
+    }
+    const [k, v] = p.split(":");
+    if (k && v != null) m[k] = v;
+  }
+  // CVSS v2 no lleva prefijo "CVSS:"; se detecta por las métricas (AV, AC, Au).
+  if (!version) {
+    if ("Au" in m) version = "2.0";
+    else if ("AV" in m && ("PR" in m || "UI" in m)) version = "3.1";
+    else return null;
+  }
+
+  try {
+    if (version.startsWith("4")) return cvss4Score(m);
+    if (version.startsWith("3")) return cvss3Score(m);
+    if (version.startsWith("2")) return cvss2Score(m);
+  } catch (e) {
+    console.warn("CVSS calc failed for", vec, e);
+  }
+  return null;
+}
+
+/* ----- CVSS v3.0 / v3.1 ----- */
+function cvss3Score(m) {
+  // Tablas de pesos según la spec
+  const AV = { N: 0.85, A: 0.62, L: 0.55, P: 0.2 };
+  const AC = { L: 0.77, H: 0.44 };
+  // PR depende de Scope (S:U vs S:C). Cuando S:C y PR:L/H, los pesos cambian.
+  const PR = {
+    U: { N: 0.85, L: 0.62, H: 0.27 },
+    C: { N: 0.85, L: 0.68, H: 0.50 }
+  };
+  const UI = { N: 0.85, R: 0.62 };
+  const CIA = { H: 0.56, L: 0.22, N: 0 };
+
+  const av = AV[m.AV]; if (av == null) return null;
+  const ac = AC[m.AC]; if (ac == null) return null;
+  const scope = (m.S === "C") ? "C" : "U";
+  const pr = PR[scope][m.PR]; if (pr == null) return null;
+  const ui = UI[m.UI]; if (ui == null) return null;
+  const c = CIA[m.C], i = CIA[m.I], a = CIA[m.A];
+  if (c == null || i == null || a == null) return null;
+
+  // Impact Sub-Score
+  const iss = 1 - (1 - c) * (1 - i) * (1 - a);
+  let impact;
+  if (scope === "U") {
+    impact = 6.42 * iss;
+  } else {
+    impact = 7.52 * (iss - 0.029) - 3.25 * Math.pow(iss - 0.02, 15);
+  }
+  if (impact <= 0) return 0.0;
+
+  const exploitability = 8.22 * av * ac * pr * ui;
+  let base;
+  if (scope === "U") {
+    base = Math.min(impact + exploitability, 10);
+  } else {
+    base = Math.min(1.08 * (impact + exploitability), 10);
+  }
+  return roundUp1(base);
+}
+
+// CVSS v3 usa "round up to nearest 0.1" definido como:
+// ceil(x * 10) / 10 con tolerancia para flotantes
+function roundUp1(x) {
+  const intInput = Math.round(x * 100000);
+  if (intInput % 10000 === 0) return intInput / 100000;
+  return (Math.floor(intInput / 10000) + 1) / 10;
+}
+
+/* ----- CVSS v2 ----- */
+function cvss2Score(m) {
+  const AV = { N: 1.0, A: 0.646, L: 0.395 };
+  const AC = { L: 0.71, M: 0.61, H: 0.35 };
+  const Au = { N: 0.704, S: 0.56, M: 0.45 };
+  const CIA = { N: 0, P: 0.275, C: 0.660 };
+
+  const av = AV[m.AV], ac = AC[m.AC], au = Au[m.Au];
+  const c = CIA[m.C], i = CIA[m.I], a = CIA[m.A];
+  if ([av, ac, au, c, i, a].some(x => x == null)) return null;
+
+  const impact = 10.41 * (1 - (1 - c) * (1 - i) * (1 - a));
+  const exploitability = 20 * av * ac * au;
+  const fImpact = impact === 0 ? 0 : 1.176;
+  const base = ((0.6 * impact) + (0.4 * exploitability) - 1.5) * fImpact;
+  return Math.round(base * 10) / 10;
+}
+
+/* ----- CVSS v4.0 (aproximación) -----
+   La spec oficial usa tablas de macro-vectores con 270+ entradas precomputadas.
+   Esta aproximación replica el comportamiento para los vectores base más
+   comunes (AV/AC/AT/PR/UI/VC/VI/VA/SC/SI/SA). No es exacta para todos los
+   vectores combinados con threat/environmental, pero da una severidad
+   cercana al ±0.5 para vectores base puros. */
+function cvss4Score(m) {
+  const AV = { N: 0.85, A: 0.62, L: 0.55, P: 0.2 };
+  const AC = { L: 0.77, H: 0.44 };
+  const AT = { N: 0.85, P: 0.6 };
+  const PR = { N: 0.85, L: 0.62, H: 0.27 };
+  const UI = { N: 0.85, P: 0.7, A: 0.5 };
+  const IMP = { H: 0.56, L: 0.22, N: 0 };
+
+  const av = AV[m.AV], ac = AC[m.AC], at = AT[m.AT] ?? 0.85;
+  const pr = PR[m.PR], ui = UI[m.UI];
+  if ([av, ac, pr, ui].some(x => x == null)) return null;
+
+  // Impacto sobre Vulnerable System
+  const vc = IMP[m.VC] ?? 0, vi = IMP[m.VI] ?? 0, va = IMP[m.VA] ?? 0;
+  const vssImp = 1 - (1 - vc) * (1 - vi) * (1 - va);
+  // Impacto sobre Subsequent System (subsystem)
+  const sc = IMP[m.SC] ?? 0, si = IMP[m.SI] ?? 0, sa = IMP[m.SA] ?? 0;
+  const sssImp = 1 - (1 - sc) * (1 - si) * (1 - sa);
+
+  const combinedImpact = Math.max(vssImp, sssImp * 0.9);
+  if (combinedImpact <= 0) return 0.0;
+
+  const exploit = 8.22 * av * ac * at * pr * ui;
+  const base = Math.min((6.42 * combinedImpact) + exploit, 10);
+  return roundUp1(base);
+}
+
+function severityFromScore(s) {
+  if (s == null) return null;
+  if (s >= 9.0) return "critical";
+  if (s >= 7.0) return "high";
+  if (s >= 4.0) return "medium";
+  if (s > 0)    return "low";
+  return "none";
+}
+function normaliseSev(s) {
+  if (!s) return null;
+  const x = s.toLowerCase();
+  if (x.startsWith("crit")) return "critical";
+  if (x.startsWith("high")) return "high";
+  if (x.startsWith("med") || x === "moderate") return "medium";
+  if (x.startsWith("low")) return "low";
+  return null;
+}
+
+function extractCVEs(v) {
+  const ids = [v.id, ...(v.aliases || [])];
+  return ids.filter(x => /^CVE-\d{4}-\d+$/i.test(x)).map(x => x.toUpperCase());
+}
+
+/* ---------- EPSS ---------- */
+async function queryEPSS(cves) {
+  const map = new Map();
+  // FIRST EPSS soporta hasta ~100 CVEs por llamada con coma
+  const CHUNK = 80;
+  for (let i = 0; i < cves.length; i += CHUNK) {
+    const chunk = cves.slice(i, i + CHUNK);
+    const url = `https://api.first.org/data/v1/epss?cve=${chunk.join(",")}`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const row of (data.data || [])) {
+        map.set(row.cve.toUpperCase(), {
+          epss: parseFloat(row.epss),
+          percentile: parseFloat(row.percentile),
+          date: row.date
+        });
+      }
+    } catch (e) { console.warn("EPSS chunk failed", e); }
+  }
+  return map;
+}
+
+/* ---------- CISA KEV ----------
+   Descarga el catálogo completo (≈6000 entradas, ~3MB) una sola vez por
+   sesión de scan y construye un Map<CVE_ID, kevEntry> para matching O(1).
+
+   IMPORTANTE: la URL canónica `https://www.cisa.gov/sites/default/files/feeds/...`
+   está detrás de Akamai sin headers CORS, así que los fetches desde un
+   navegador devuelven "Failed to fetch". Usamos primero el mirror oficial
+   de CISA en GitHub (cisagov/kev-data) que sí trae CORS abierto, y dejamos
+   la URL canónica como fallback por si algún día CISA habilita CORS.
+
+   Si todas las fuentes fallan, el escaneo continúa sin datos KEV — la app
+   no depende de este feed. */
+let kevCache = null;
+const KEV_SOURCES = [
+  // Mirror oficial de CISA en GitHub, mismo contenido bit-a-bit, con CORS.
+  "https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json",
+  // Fallback: URL canónica (suele fallar por CORS desde el navegador).
+  "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+];
+
+async function queryKEV() {
+  if (kevCache) return kevCache;
+  for (let i = 0; i < KEV_SOURCES.length; i++) {
+    const url = KEV_SOURCES[i];
+    const label = i === 0 ? "mirror GitHub" : "CISA directo";
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        log(`CISA KEV (${label}) HTTP ${res.status} · probando siguiente fuente…`, "warn");
+        continue;
+      }
+      const data = await res.json();
+      const map = new Map();
+      for (const v of (data.vulnerabilities || [])) {
+        if (!v.cveID) continue;
+        map.set(v.cveID.toUpperCase(), {
+          cveID: v.cveID,
+          vendor: v.vendorProject || "",
+          product: v.product || "",
+          name: v.vulnerabilityName || "",
+          description: v.shortDescription || "",
+          dateAdded: v.dateAdded || "",
+          dueDate: v.dueDate || "",
+          requiredAction: v.requiredAction || "",
+          ransomware: (v.knownRansomwareCampaignUse || "").toLowerCase() === "known",
+          notes: v.notes || ""
+        });
+      }
+      kevCache = map;
+      log(`CISA KEV cargado desde ${label} · ${map.size} CVEs en el catálogo`, "ok");
+      return map;
+    } catch (e) {
+      // CORS / network errors caen aquí
+      log(`CISA KEV (${label}) error: ${e.message || e} · probando siguiente fuente…`, "warn");
+    }
+  }
+  log("Todas las fuentes KEV fallaron · continuando sin enriquecimiento KEV", "err");
+  return new Map();
+}
+
+/* ---------- NVD ---------- */
+async function queryNVD(cve) {
+  try {
+    const res = await fetch(`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${cve}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const v = data.vulnerabilities?.[0]?.cve;
+    if (!v) return null;
+    const desc = (v.descriptions || []).find(d => d.lang === "en")?.value || "";
+    const metrics = v.metrics || {};
+    let cvssScore = null, cvssVector = null, cvssVersion = null;
+    const order = ["cvssMetricV31","cvssMetricV30","cvssMetricV2"];
+    for (const k of order) {
+      if (Array.isArray(metrics[k]) && metrics[k].length) {
+        const m = metrics[k][0].cvssData;
+        cvssScore = m.baseScore;
+        cvssVector = m.vectorString;
+        cvssVersion = "CVSS_V" + (m.version || "").replace(".", "");
+        break;
+      }
+    }
+    return {
+      description: desc,
+      cvssScore, cvssVector, cvssVersion,
+      published: v.published, lastModified: v.lastModified
+    };
+  } catch (e) { return null; }
+}
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+function renderSummary() {
+  const summary = $("#summary");
+  let totalPkgs = scanResults.length;
+  let vulnPkgs = 0;
+  let totalVulns = 0;
+  const bySev = { critical: 0, high: 0, medium: 0, low: 0, none: 0 };
+  for (const r of scanResults) {
+    if (r.vulns.length) vulnPkgs++;
+    totalVulns += r.vulns.length;
+    for (const v of r.vulns) {
+      bySev[v.severity || "none"]++;
+    }
+  }
+  summary.innerHTML = `
+    <div class="stat">
+      <div class="stat-label">Paquetes</div>
+      <div class="stat-value">${totalPkgs}</div>
+      <div class="stat-sub">analizados</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Vulnerables</div>
+      <div class="stat-value ${vulnPkgs ? 'high':''}">${vulnPkgs}</div>
+      <div class="stat-sub">${((vulnPkgs/totalPkgs)*100||0).toFixed(1)}% del total</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Vulns totales</div>
+      <div class="stat-value">${totalVulns}</div>
+      <div class="stat-sub">registros únicos</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Crítico</div>
+      <div class="stat-value crit">${bySev.critical}</div>
+      <div class="stat-sub">CVSS ≥ 9.0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Alto</div>
+      <div class="stat-value high">${bySev.high}</div>
+      <div class="stat-sub">7.0 – 8.9</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Medio</div>
+      <div class="stat-value med">${bySev.medium}</div>
+      <div class="stat-sub">4.0 – 6.9</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Bajo</div>
+      <div class="stat-value low">${bySev.low}</div>
+      <div class="stat-sub">0.1 – 3.9</div>
+    </div>
+  `;
+  summary.classList.add("shown");
+}
+
+function renderTable() {
+  tbody.innerHTML = "";
+  const filtered = scanResults.filter(r => {
+    // search
+    const q = searchQuery.toLowerCase();
+    if (q) {
+      const hay = (r.pkg.name + " " + r.pkg.version + " " + r.pkg.purl + " " +
+                   r.vulns.map(v => v.id + " " + (v.aliases||[]).join(" ")).join(" ")).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (activeFilter === "all") return true;
+    if (activeFilter === "vulnerable") return r.vulns.length > 0;
+    if (activeFilter === "kev") return r.vulns.some(v => v.kev);
+    // Filtrar por la severidad MÁXIMA del paquete, no por "tiene alguna de ese nivel".
+    // Esto evita que al filtrar "Alto" aparezcan paquetes con Críticos
+    // (que ya mostraría el badge Crítico de la columna "Severidad máx.").
+    return maxSeverity(r.vulns) === activeFilter;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:32px;text-align:center;color:var(--text-faint);">Sin resultados para este filtro.</td></tr>`;
+    return;
+  }
+
+  // Sort: crit -> high -> med -> low -> none
+  const sevOrder = { critical:0, high:1, medium:2, low:3, none:4, undefined:5, null:5 };
+  filtered.sort((a, b) => {
+    const sa = Math.min(...a.vulns.map(v => sevOrder[v.severity]).concat([6]));
+    const sb = Math.min(...b.vulns.map(v => sevOrder[v.severity]).concat([6]));
+    if (sa !== sb) return sa - sb;
+    return b.vulns.length - a.vulns.length;
+  });
+
+  for (const r of filtered) {
+    const tr = document.createElement("tr");
+    const maxSev = maxSeverity(r.vulns);
+    const maxCvss = Math.max(0, ...r.vulns.map(v => v.cvssScore || 0));
+    const maxEpss = r.vulns.reduce((max, v) => {
+      if (v.epss && (!max || v.epss.epss > max.epss)) return v.epss;
+      return max;
+    }, null);
+    const vexCount = r.vulns.filter(v => v.vex).length;
+    const kevCount = r.vulns.filter(v => v.kev).length;
+    const kevRansomware = r.vulns.some(v => v.kev?.ransomware);
+
+    tr.dataset.idx = scanResults.indexOf(r);
+    const kevIcon = kevCount
+      ? `<span class="kev-icon${kevRansomware ? ' ransomware' : ''}" title="${kevCount} CVE${kevCount>1?'s':''} en CISA KEV${kevRansomware ? ' · uso en ransomware confirmado' : ''}">!</span>`
+      : "";
+    const vexPart = vexCount
+      ? `<span style="color:var(--accent-2);">▸ ${vexCount}</span>`
+      : (kevCount ? "" : `<span style="color:var(--text-faint);">—</span>`);
+    tr.innerHTML = `
+      <td class="name">${escapeHtml(r.pkg.name)}</td>
+      <td class="version">${escapeHtml(r.pkg.version || "—")}</td>
+      <td style="color:var(--text-dim);">${escapeHtml(r.pkg.ecosystem)}</td>
+      <td class="sev-cell">${ maxSev ? `<span class="sev-badge ${maxSev}">${maxSev}</span>` : `<span class="sev-badge none">—</span>` }</td>
+      <td>${ maxCvss ? `<strong style="color:${cvssColor(maxCvss)}">${maxCvss.toFixed(1)}</strong>` : `<span style="color:var(--text-faint);">—</span>` }</td>
+      <td>${ maxEpss ? formatEpss(maxEpss) : `<span style="color:var(--text-faint);">—</span>` }</td>
+      <td><span class="sev-count">${r.vulns.length}</span></td>
+      <td>${kevIcon}${vexPart}</td>
+    `;
+    tr.addEventListener("click", () => toggleExpand(tr, r));
+    tbody.appendChild(tr);
+  }
+}
+
+function toggleExpand(tr, r) {
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains("expand-row")) {
+    next.remove();
+    tr.classList.remove("expanded");
+    return;
+  }
+  // close other expansions
+  document.querySelectorAll(".expand-row").forEach(n => n.remove());
+  document.querySelectorAll("tr.expanded").forEach(n => n.classList.remove("expanded"));
+  tr.classList.add("expanded");
+  const exp = document.createElement("tr");
+  exp.className = "expand-row";
+  const td = document.createElement("td");
+  td.colSpan = 8;
+  td.innerHTML = renderExpansion(r);
+  exp.appendChild(td);
+  tr.after(exp);
+}
+
+function renderExpansion(r) {
+  const p = r.pkg;
+  let html = `<div class="expand-inner">
+    <div class="pkg-detail-grid">
+      <div><div class="meta-label">Identificador</div><div class="meta-value">${escapeHtml(p.ref || "—")}</div></div>
+      <div><div class="meta-label">PURL</div><div class="meta-value dim">${escapeHtml(p.purl || "—")}</div></div>
+      <div><div class="meta-label">Ecosistema</div><div class="meta-value">${escapeHtml(p.ecosystem)}</div></div>
+      <div><div class="meta-label">Versión</div><div class="meta-value">${escapeHtml(p.version || "—")}</div></div>
+    </div>`;
+
+  if (r.vulns.length === 0) {
+    html += `<div class="no-vulns">✓ Sin vulnerabilidades conocidas en OSV.dev para esta combinación de paquete + versión.</div></div>`;
+    return html;
+  }
+
+  // sort vulns by sev/score
+  const sevOrder = { critical:0, high:1, medium:2, low:3, none:4 };
+  const sorted = [...r.vulns].sort((a, b) =>
+    (sevOrder[a.severity] ?? 5) - (sevOrder[b.severity] ?? 5) ||
+    (b.cvssScore || 0) - (a.cvssScore || 0)
+  );
+
+  html += `<div class="vuln-list">`;
+  for (const v of sorted) {
+    const sev = v.severity || "none";
+    const cves = extractCVEs(v);
+    const primaryCve = cves[0];
+    const link = primaryCve
+      ? `https://nvd.nist.gov/vuln/detail/${primaryCve}`
+      : (v.id?.startsWith("GHSA") ? `https://github.com/advisories/${v.id}` : `https://osv.dev/vulnerability/${v.id}`);
+
+    const desc = v.summary || v.details || "(Sin descripción disponible.)";
+    const trimmedDesc = desc.length > 600 ? desc.slice(0, 600) + "…" : desc;
+
+    html += `<div class="vuln-card ${sev}">
+      <div class="vuln-head">
+        <a class="vuln-id" href="${link}" target="_blank" rel="noopener">${escapeHtml(v.id)}</a>
+        ${ v.kev ? `<span class="kev-badge${v.kev.ransomware ? ' ransomware' : ''}">${v.kev.ransomware ? '🦠 Usado en ransomware' : '⚠ Explotado in the wild'}</span>` : '' }
+        <span class="sev-badge ${sev}">${sev}${v.cvssScore ? " · " + v.cvssScore.toFixed(1) : ""}</span>
+      </div>
+      ${ v.aliases?.length ? `<div class="vuln-aliases">Alias: ${v.aliases.map(escapeHtml).join(" · ")}</div>` : "" }
+      <div class="vuln-summary">${escapeHtml(trimmedDesc)}</div>
+      <div class="vuln-meta">
+        <div class="meta-cell span-2">
+          <div class="meta-label">CVSS</div>
+          <div class="meta-value ${v.cvssScore?'':'dim'}">${ v.cvssScore != null ? v.cvssScore.toFixed(1) : '—' }</div>
+        </div>
+        <div class="meta-cell span-6">
+          <div class="meta-label">Vector</div>
+          <div class="meta-value vector">${escapeHtml(v.cvssVector || "—")}</div>
+        </div>
+        <div class="meta-cell span-2">
+          <div class="meta-label">EPSS Score</div>
+          <div class="meta-value">${ v.epss ? (v.epss.epss * 100).toFixed(2) + '%' : '—' }</div>
+        </div>
+        <div class="meta-cell span-2">
+          <div class="meta-label">Percentil</div>
+          <div class="meta-value">${ v.epss ? 'p' + (v.epss.percentile * 100).toFixed(1) : '—' }</div>
+        </div>
+        <div class="meta-cell span-4">
+          <div class="meta-label">Publicado</div>
+          <div class="meta-value dim">${ v.published ? escapeHtml(formatLongDate(v.published)) : '—' }</div>
+        </div>
+        <div class="meta-cell span-4">
+          <div class="meta-label">Versiones afectadas</div>
+          <div class="meta-value">${ v.affected?.length ? escapeHtml(v.affected.join(" · ")) : '<span style="color:var(--text-faint);">—</span>' }</div>
+        </div>
+        <div class="meta-cell span-4">
+          <div class="meta-label">Versiones corregidas</div>
+          <div class="meta-value">${ v.fixed?.length ? escapeHtml(v.fixed.join(", ")) : '<span style="color:var(--text-faint);">—</span>' }</div>
+        </div>
+      </div>
+      ${ v.kev ? renderKev(v.kev) : "" }
+      ${ v.vex ? renderVex(v.vex) : "" }
+      ${ v.references?.length ? `<div class="vuln-refs">${
+          v.references.slice(0, 6).map(ref =>
+            `<a href="${escapeHtml(ref.url)}" target="_blank" rel="noopener">${escapeHtml(ref.type || "ref")} ↗</a>`
+          ).join("")
+        }</div>` : "" }
+    </div>`;
+  }
+  html += `</div></div>`;
+  return html;
+}
+
+function renderVex(vex) {
+  const parts = [];
+  if (vex.state) parts.push(`<strong>VEX · Estado declarado</strong><div>${escapeHtml(vex.state)}</div>`);
+  if (vex.justification) parts.push(`<div style="margin-top:6px;"><em style="color:var(--text-faint);">Justificación:</em> ${escapeHtml(vex.justification)}</div>`);
+  if (vex.detail) parts.push(`<div style="margin-top:6px;"><em style="color:var(--text-faint);">Detalle:</em> ${escapeHtml(vex.detail)}</div>`);
+  if (!parts.length) return "";
+  return `<div class="vex-block">${parts.join("")}</div>`;
+}
+
+function renderKev(kev) {
+  // Días restantes hasta la fecha límite BOD 22-01
+  let dueLabel = kev.dueDate ? escapeHtml(kev.dueDate) : "—";
+  let dueIsOverdue = false;
+  if (kev.dueDate) {
+    const dueMs = Date.parse(kev.dueDate);
+    if (!isNaN(dueMs)) {
+      const days = Math.floor((dueMs - Date.now()) / 86400000);
+      if (days < 0) {
+        dueLabel = `${escapeHtml(kev.dueDate)} · vencido hace ${-days}d`;
+        dueIsOverdue = true;
+      } else {
+        dueLabel = `${escapeHtml(kev.dueDate)} · en ${days}d`;
+      }
+    }
+  }
+  const product = [kev.vendor, kev.product].filter(Boolean).map(escapeHtml).join(" / ") || "—";
+
+  return `<div class="kev-block">
+    <div class="kev-title">
+      ▲ CISA Known Exploited Vulnerabilities Catalog
+      ${ kev.ransomware ? `<span style="color:#ff7a87; font-size:10.5px; padding:2px 8px; border:1px solid #ff7a87; letter-spacing:0.12em;">RANSOMWARE</span>` : '' }
+    </div>
+    <div style="margin-bottom:10px; color:var(--text); font-family:var(--serif); font-size:14px; font-style:italic;">
+      ${escapeHtml(kev.name || "(sin nombre asignado)")}
+    </div>
+    <div class="kev-grid">
+      <div class="kev-field">
+        <span class="kev-field-label">Vendor / Producto</span>
+        <span class="kev-field-value">${product}</span>
+      </div>
+      <div class="kev-field">
+        <span class="kev-field-label">Añadido al catálogo</span>
+        <span class="kev-field-value">${ kev.dateAdded ? escapeHtml(kev.dateAdded) : '—' }</span>
+      </div>
+      <div class="kev-field">
+        <span class="kev-field-label">Fecha límite (BOD 22-01)</span>
+        <span class="kev-field-value ${dueIsOverdue ? 'danger' : ''}">${dueLabel}</span>
+      </div>
+      <div class="kev-field">
+        <span class="kev-field-label">Uso en ransomware</span>
+        <span class="kev-field-value ${kev.ransomware ? 'danger' : ''}">${ kev.ransomware ? 'Sí · confirmado' : 'No documentado' }</span>
+      </div>
+    </div>
+    ${ kev.requiredAction ? `<div style="margin-top:6px;">
+      <div class="kev-field-label" style="margin-bottom:3px;">Acción requerida</div>
+      <div style="color:var(--text); font-size:12.5px; line-height:1.55;">${escapeHtml(kev.requiredAction)}</div>
+    </div>` : '' }
+    ${ kev.notes ? `<div class="kev-notes">${escapeHtml(kev.notes)}</div>` : '' }
+  </div>`;
+}
+
+function maxSeverity(vulns) {
+  const order = ["critical","high","medium","low","none"];
+  for (const s of order) if (vulns.some(v => v.severity === s)) return s;
+  return null;
+}
+function cvssColor(score) {
+  if (score >= 9) return "var(--crit)";
+  if (score >= 7) return "var(--high)";
+  if (score >= 4) return "var(--med)";
+  if (score > 0)  return "var(--low)";
+  return "var(--text-faint)";
+}
+function formatEpss(e) {
+  const pct = (e.epss * 100).toFixed(2);
+  const perc = (e.percentile * 100).toFixed(0);
+  let color = "var(--text-dim)";
+  if (e.epss >= 0.5) color = "var(--crit)";
+  else if (e.epss >= 0.1) color = "var(--high)";
+  else if (e.epss >= 0.01) color = "var(--med)";
+  return `<span style="color:${color}">${pct}%</span><span style="color:var(--text-faint);font-size:10px;"> · p${perc}</span>`;
+}
+function escapeHtml(s) {
+  if (s == null) return "";
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  }[c]));
+}
+
+/* Formatea una fecha ISO (YYYY-MM-DD o ISO completo) a "Mes D, AAAA" en español.
+   Parseo manual para evitar el bug de zona horaria al pasar "YYYY-MM-DD" a Date(),
+   que algunos navegadores interpretan como UTC y puede correr la fecha un día. */
+const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+function formatLongDate(s) {
+  if (!s) return "";
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return s;
+  const year = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);  // 1..12
+  const day = parseInt(m[3], 10);
+  if (month < 1 || month > 12) return s;
+  return `${MESES_ES[month - 1]} ${day}, ${year}`;
+}
+
+/* ---------- Filters / search · panel Paquetes ---------- */
+document.querySelectorAll("#panelPackages .filter-btn").forEach(b =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#panelPackages .filter-btn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    activeFilter = b.dataset.filter;
+    renderTable();
+  })
+);
+$("#searchInput").addEventListener("input", e => {
+  searchQuery = e.target.value.trim();
+  renderTable();
+});
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll(".tab").forEach(tab =>
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    $("#panel" + tab.dataset.panel[0].toUpperCase() + tab.dataset.panel.slice(1)).classList.add("active");
+  })
+);
+
+/* ---------- Top EPSS ---------- */
+let epssFilter = "all";
+let epssSearch = "";
+let epssRows = [];   // flat list of {cve, pkg, vuln}
+
+function buildEpssRows() {
+  const rows = [];
+  for (const r of scanResults) {
+    for (const v of r.vulns) {
+      if (!v.epss) continue;
+      const cves = extractCVEs(v);
+      const cve = cves[0] || v.id;
+      rows.push({
+        cve,
+        vulnId: v.id,
+        pkg: r.pkg,
+        vuln: v,
+        epssScore: v.epss.epss,
+        epssPercentile: v.epss.percentile
+      });
+    }
+  }
+  rows.sort((a, b) => b.epssScore - a.epssScore);
+  return rows;
+}
+
+function renderEpssTable() {
+  const body = $("#epssTableBody");
+  body.innerHTML = "";
+
+  const threshold = epssFilter === "all" ? -1 : parseFloat(epssFilter);
+  const q = epssSearch.toLowerCase();
+
+  const filtered = epssRows.filter(r => {
+    if (r.epssScore < threshold) return false;
+    if (q) {
+      const hay = (r.cve + " " + r.vulnId + " " + r.pkg.name + " " + r.pkg.version).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  $("#countEpss").textContent = epssRows.length ? `· ${epssRows.length}` : "";
+
+  if (filtered.length === 0) {
+    body.innerHTML = `<tr><td colspan="7"><div class="epss-empty">${
+      epssRows.length === 0
+        ? "Sin datos de EPSS — ejecuta un escaneo primero, o las vulnerabilidades encontradas no tienen CVEs registrados en EPSS."
+        : "Sin resultados para este filtro."
+    }</div></td></tr>`;
+    return;
+  }
+
+  let i = 1;
+  for (const r of filtered) {
+    const tr = document.createElement("tr");
+    const sev = r.vuln.severity || "none";
+    const cveLink = /^CVE-/.test(r.cve)
+      ? `https://nvd.nist.gov/vuln/detail/${r.cve}`
+      : (r.cve.startsWith("GHSA")
+          ? `https://github.com/advisories/${r.cve}`
+          : `https://osv.dev/vulnerability/${r.cve}`);
+
+    const fillPct = Math.max(2, r.epssScore * 100);
+    tr.innerHTML = `
+      <td class="epss-rank">${String(i).padStart(2, "0")}</td>
+      <td class="epss-cve">${ r.vuln.kev ? `<span class="kev-icon${r.vuln.kev.ransomware ? ' ransomware' : ''}" title="En CISA KEV${r.vuln.kev.ransomware ? ' · uso en ransomware' : ''}">!</span>` : '' }<a href="${cveLink}" target="_blank" rel="noopener">${escapeHtml(r.cve)}</a></td>
+      <td>
+        <div style="color:var(--text);">${escapeHtml(r.pkg.name)} <span style="color:var(--accent-2);">${escapeHtml(r.pkg.version)}</span></div>
+        <div style="color:var(--text-faint); font-size:10.5px; margin-top:2px;">${escapeHtml(r.pkg.ecosystem)}</div>
+      </td>
+      <td>
+        <div class="epss-bar">
+          <div class="fill" style="width:${fillPct}%;"></div>
+          <span class="label">${(r.epssScore * 100).toFixed(2)}%</span>
+        </div>
+      </td>
+      <td style="color:var(--text-dim);">p${(r.epssPercentile * 100).toFixed(1)}</td>
+      <td>${ r.vuln.cvssScore != null ? `<span style="color:${cvssColor(r.vuln.cvssScore)};font-weight:500;">${r.vuln.cvssScore.toFixed(1)}</span>` : `<span style="color:var(--text-faint);">—</span>` }</td>
+      <td><span class="sev-badge ${sev}">${sev}</span></td>
+    `;
+    // click → ir al paquete y expandirlo
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => {
+      // switch a panel Paquetes
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      document.querySelector('.tab[data-panel="packages"]').classList.add("active");
+      $("#panelPackages").classList.add("active");
+      // limpiar filtros y búsqueda
+      activeFilter = "all";
+      searchQuery = "";
+      $("#searchInput").value = "";
+      document.querySelectorAll("#panelPackages .filter-btn").forEach(x => x.classList.remove("active"));
+      document.querySelector('#panelPackages .filter-btn[data-filter="all"]').classList.add("active");
+      renderTable();
+      // localizar el row del paquete y expandirlo
+      const targetIdx = scanResults.findIndex(s => s.pkg === r.pkg);
+      setTimeout(() => {
+        const targetRow = tbody.querySelector(`tr[data-idx="${targetIdx}"]`);
+        if (targetRow) {
+          targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
+          if (!targetRow.classList.contains("expanded")) {
+            toggleExpand(targetRow, scanResults[targetIdx]);
+          }
+        }
+      }, 50);
+    });
+    body.appendChild(tr);
+    i++;
+  }
+}
+
+document.querySelectorAll("#panelEpss .filter-btn").forEach(b =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#panelEpss .filter-btn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    epssFilter = b.dataset.epssFilter;
+    renderEpssTable();
+  })
+);
+$("#epssSearch").addEventListener("input", e => {
+  epssSearch = e.target.value.trim();
+  renderEpssTable();
+});
+</script>
+</body>
+</html>

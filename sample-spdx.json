@@ -1,0 +1,83 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "demo-webapp-spdx",
+  "documentNamespace": "https://example.com/demo-webapp/2.4.0",
+  "creationInfo": {
+    "created": "2024-03-15T08:30:00Z",
+    "creators": ["Tool: sbom-demo-generator-1.0"]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-lodash",
+      "name": "lodash",
+      "versionInfo": "4.17.15",
+      "downloadLocation": "https://registry.npmjs.org/lodash/-/lodash-4.17.15.tgz",
+      "filesAnalyzed": false,
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/lodash@4.17.15"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-django",
+      "name": "django",
+      "versionInfo": "2.2.0",
+      "downloadLocation": "https://pypi.org/project/Django/2.2.0/",
+      "filesAnalyzed": false,
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/django@2.2.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-log4j",
+      "name": "log4j-core",
+      "versionInfo": "2.14.1",
+      "downloadLocation": "https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-core/2.14.1/",
+      "filesAnalyzed": false,
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-pillow",
+      "name": "pillow",
+      "versionInfo": "8.1.0",
+      "downloadLocation": "https://pypi.org/project/Pillow/8.1.0/",
+      "filesAnalyzed": false,
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/pillow@8.1.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-react",
+      "name": "react",
+      "versionInfo": "18.2.0",
+      "downloadLocation": "https://registry.npmjs.org/react/-/react-18.2.0.tgz",
+      "filesAnalyzed": false,
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/react@18.2.0"
+        }
+      ]
+    }
+  ]
+}
